@@ -41,13 +41,17 @@
     -ADModNumber "3"
 
 .NOTES
-    Version: 1.0.3
+    Version: 1.1.0
     Author: Bradley Wyatt
     Date: 12/4/2018
     Modified: JBear 12/5/2018
     Bradley Wyatt 12/8/2018
-    jporgand 12/6/2018
+	jporgand 12/6/2018
+	Daniel Knippshild 11/20/2019
 #>
+
+#Requires -Version 5.1
+#Requires -Module ActiveDirectory
 
 param (
 	
@@ -104,7 +108,7 @@ function LastLogonConvert ($ftDate)
 	
 	$Date = [DateTime]::FromFileTime($ftDate)
 	
-	if ($Date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $date -eq $null)
+	if ($Date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $null -eq $date)
 	{
 		
 		"Never"
@@ -219,7 +223,33 @@ $TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 
 #Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
-$AllUsers = Get-ADUser -Filter * -Properties *
+# $AllUsers = Get-ADUser -Filter * -Properties *
+
+#Retrieve all known Domain Controllers
+$DCs = (Get-ADDomainController -Filter *).Name
+
+#Loop through all Domain Controllers for user data; ensures most recent LastLogon attribute value is used for accuracy
+$AllDCUsers = foreach($DC in $DCs) {
+
+    #Get all AD User Data from each Domain Controller
+    Get-ADUser -Server $DC -Filter * -Properties * | Sort-Object Name
+}
+
+#Retrieve all users
+$AllUsers = $(
+
+    #Select unique accountnames; all user data will be in multiples of the number of Domain Controllers you have
+    $Unique = ($AllDCUsers | Select-Object SamAccountName -Unique | Sort-Object SamAccountName).SamAccountName
+
+    foreach($U in $Unique) {
+
+        #Selects most recent LastLogon time User Object from all Domain Controllers AD User Data; LastLogon does NOT replicate across Domain Controllers
+        ($AllDCUsers | Where-Object { $_.SamAccountName -Match $U } | Sort-Object LastLogon -Descending)[0]
+    }
+)
+
+#Retrieve all computers
+$Computers = Get-ADComputer -Filter * -Properties *
 
 $GPOs = Get-GPO -All | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
 
@@ -233,8 +263,12 @@ $dte = (Get-Date).AddDays(- $ADModNumber)
 
 $ADObjs = Get-ADObject -Filter { whenchanged -gt $dte -and ObjectClass -ne "domainDNS" -and ObjectClass -ne "rIDManager" -and ObjectClass -ne "rIDSet" } -Properties *
 
+$CurrentADObjs = 0
+$TotalADObjs = $ADObjs.Count
+
 foreach ($ADObj in $ADObjs)
 {
+	Write-Progress -Activity "Processing $($CurrentADObjs++) of $($TotalADObjs) AD Objects..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalADObjs - $CurrentADObjs) / $TotalADObjs) * 100) + "%") -PercentComplete ((($TotalADObjs - $CurrentADObjs) / $TotalADObjs) * 100) -ErrorAction SilentlyContinue
 	
 	if ($ADObj.ObjectClass -eq "GroupPolicyContainer")
 	{
@@ -321,9 +355,14 @@ if (($CompanyInfoTable).Count -eq 0)
 $When = ((Get-Date).AddDays(- $UserCreatedDays)).Date
 $NewUsers = $AllUsers | Where-Object { $_.whenCreated -ge $When }
 
+$TotalNewUsers = $NewUsers.Count
+$CurrentUserCount = 0
+
 foreach ($Newuser in $Newusers)
 {
 	
+	Write-Progress -Activity "Processing $($CurrentUserCount++) of $($TotalNewUsers) New Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalNewUsers - $CurrentUserCount) / $TotalNewUsers) * 100) + "%") -PercentComplete ((($TotalNewUsers - $CurrentUserCount) / $TotalNewUsers) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $Newuser.Name
@@ -348,8 +387,13 @@ if (($NewCreatedUsersTable).Count -eq 0)
 #Get Domain Admins
 $DomainAdminMembers = Get-ADGroupMember "Domain Admins"
 
+$TotalAdmins = $DomainAdminMembers.Count
+$CurrentAdminCount = 0
+
 foreach ($DomainAdminMember in $DomainAdminMembers)
 {
+	
+	Write-Progress -Activity "Processing $($CurrentAdminCount++) of $($TotalAdmins) Domain Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalAdmins - $CurrentAdminCount) / $TotalAdmins) * 100) + "%") -PercentComplete ((($TotalAdmins - $CurrentAdminCount) / $TotalAdmins) * 100) -ErrorAction SilentlyContinue	
 	
 	$Name = $DomainAdminMember.Name
 	$Type = $DomainAdminMember.ObjectClass
@@ -375,13 +419,16 @@ if (($DomainAdminTable).Count -eq 0)
 	$DomainAdminTable.Add($obj)
 }
 
-
 #Get Enterprise Admins
 $EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins" -Server $SchemaMaster
 
+$TotalEnterpriseAdmins = $EnterpriseAdminsMembers.Count
+$CurrentEnterpriseAdmin = 0
+
 foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 {
-	
+	Write-Progress -Activity "Processing $($CurrentEnterpriseAdmin++) of $($TotalEnterpriseAdmins) Enterprise Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalEnterpriseAdmins - $CurrentEnterpriseAdmin) / $TotalEnterpriseAdmins) * 100) + "%") -PercentComplete ((($TotalEnterpriseAdmins - $CurrentEnterpriseAdmin) / $TotalEnterpriseAdmins) * 100) -ErrorAction SilentlyContinue
+
 	$Name = $EnterpriseAdminsMember.Name
 	$Type = $EnterpriseAdminsMember.ObjectClass
 	$Enabled = ($AllUsers | Where-Object { $_.Name -eq $Name }).Enabled
@@ -406,12 +453,16 @@ if (($EnterpriseAdminTable).Count -eq 0)
 	$EnterpriseAdminTable.Add($obj)
 }
 
-$DefaultComputersOU = (Get-ADDomain).computerscontainer
-$DefaultComputers = Get-ADComputer -Filter * -Properties * -SearchBase "$DefaultComputersOU"
+$DefaultComputersOU = (Get-ADDomain).ComputersContainer
+$DefaultComputers = $Computers | Where-Object { $_.DistinguishedName -like "*$($DefaultComputersOU)"}
+
+$TotalComputers = $DefaultComputers.Count
+$CurrentComputerCount = 0
 
 foreach ($DefaultComputer in $DefaultComputers)
 {
-	
+	Write-Progress -Activity "Processing $($CurrentComputerCount++) of $($TotalComputers) Default Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) + "%") -PercentComplete ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $DefaultComputer.Name
@@ -438,9 +489,14 @@ if (($DefaultComputersinDefaultOUTable).Count -eq 0)
 $DefaultUsersOU = (Get-ADDomain).UsersContainer
 $DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
 
+$TotalDefaultUsers = $DefaultUsers.Count
+$CurrentDefaultUserCount = 0
+
 foreach ($DefaultUser in $DefaultUsers)
 {
 	
+	Write-Progress -Activity "Processing $($CurrentDefaultUserCount++) of $($TotalDefaultUsers) Default Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalDefaultUsers - $CurrentDefaultUserCount) / $TotalDefaultUsers) * 100) + "%") -PercentComplete ((($TotalDefaultUsers - $CurrentDefaultUserCount) / $TotalDefaultUsers) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $DefaultUser.Name
@@ -467,8 +523,13 @@ if (($DefaultUsersinDefaultOUTable).Count -eq 0)
 #Expiring Accounts
 $LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly
 
+$TotalLooseUsers = $LooseUsers.Count
+$CurrentLooseUserCount = 0
+
 foreach ($LooseUser in $LooseUsers)
 {
+	
+	Write-Progress -Activity "Processing $($CurrentLooseUserCount++) of $($TotalLooseUsers) Loose Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalLooseUsers - $CurrentLooseUserCount) / $TotalLooseUsers) * 100) + "%") -PercentComplete ((($TotalLooseUsers - $CurrentLooseUserCount) / $TotalLooseUsers) * 100) -ErrorAction SilentlyContinue
 	
 	$NameLoose = $LooseUser.Name
 	$UPNLoose = $LooseUser.UserPrincipalName
@@ -527,27 +588,28 @@ if (($SecurityEventTable).Count -eq 0)
 }
 
 #Tenant Domain
-$Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Object{
+#Commented out because it's not in use
+# $Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Object{
 	
-	$obj = [PSCustomObject]@{
+# 	$obj = [PSCustomObject]@{
 		
-		'UPN Suffixes' = $_
-		Valid		   = "True"
-	}
+# 		'UPN Suffixes' = $_
+# 		Valid		   = "True"
+# 	}
 	
-	$DomainTable.Add($obj)
-}
-if (($DomainTable).Count -eq 0)
-{
+# 	$DomainTable.Add($obj)
+# }
+# if (($DomainTable).Count -eq 0)
+# {
 	
-	$Obj = [PSCustomObject]@{
+# 	$Obj = [PSCustomObject]@{
 		
-		Information = 'Information: No UPN Suffixes were found'
-	}
-	$DomainTable.Add($obj)
-}
+# 		Information = 'Information: No UPN Suffixes were found'
+# 	}
+# 	$DomainTable.Add($obj)
+# }
 
-Write-Host "Done!" -ForegroundColor White
+# Write-Host "Done!" -ForegroundColor White
 
 <###########################
 
@@ -568,20 +630,26 @@ $Groupswithnomembership = 0
 $GroupsProtected = 0
 $GroupsNotProtected = 0
 
+$TotalGroups = $Groups.Count
+$CurrentGroupCount = 0
+
+
 foreach ($Group in $Groups)
 {
 	
+	Write-Progress -Activity "Processing $($CurrentGroupCount++) of $($TotalGroups) Security Groups..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalGroups - $CurrentGroupCount) / $TotalGroups) * 100) + "%") -PercentComplete ((($TotalGroups - $CurrentGroupCount) / $TotalGroups) * 100) -ErrorAction SilentlyContinue
+
 	$DefaultADGroup = 'False'
 	$Type = New-Object 'System.Collections.Generic.List[System.Object]'
 	$Gemail = (Get-ADGroup $Group -Properties mail).mail
 	
-	if (($group.GroupCategory -eq "Security") -and ($Gemail -ne $Null))
+	if (($group.GroupCategory -eq "Security") -and ($null -ne $Gemail))
 	{
 		
 		$MailSecurityCount++
 	}
 	
-	if (($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null))
+	if (($group.GroupCategory -eq "Security") -and ($Null -eq ($Gemail)))
 	{
 		
 		$SecurityCount++
@@ -618,13 +686,13 @@ foreach ($Group in $Groups)
 		$Type = "Distribution Group"
 	}
 	
-	if (($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null))
+	if (($group.GroupCategory -eq "Security") -and ($Null -eq ($Gemail)))
 	{
 		
 		$Type = "Security Group"
 	}
 	
-	if (($group.GroupCategory -eq "Security") -and (($Gemail) -ne $Null))
+	if (($group.GroupCategory -eq "Security") -and ($Null -ne ($Gemail)))
 	{
 		
 		$Type = "Mail-Enabled Security Group"
@@ -655,17 +723,19 @@ foreach ($Group in $Groups)
 		$Users = "Skipped Domain Users Membership"
 	}
 	
-	$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy
-	Try
-	{
-		$Manager = Get-ADUser -Filter { distinguishedname -like $OwnerDN } | Select-Object -ExpandProperty Name
-	}
-	Catch
-	{
-		write-host -ForegroundColor Yellow "Cannot resolve the manager, " $Manager " on the group " $group.name
-	}
+	# $OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy
+	# Try
+	# {
+	# 	$Manager = Get-ADUser -Filter { distinguishedname -like $OwnerDN } | Select-Object -ExpandProperty Name
+	# }
+	# Catch
+	# {
+	# 	write-host -ForegroundColor Yellow "Cannot resolve the manager, " $Manager " on the group " $group.name
+	# }
 	
 	#$Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
+
+	$Manager = (Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy) -replace '^CN=|,.*$'
 	
 	$obj = [PSCustomObject]@{
 		
@@ -794,9 +864,14 @@ $OUwithnoLink = 0
 $OUProtected = 0
 $OUNotProtected = 0
 
+$TotalOUs = $OUs.Count
+$CurrentOUCount = 0 
+
 foreach ($OU in $OUs)
 {
 	
+	Write-Progress -Activity "Processing $($CurrentOUCount++) of $($TotalOUs) Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalOUs - $CurrentOUCount) / $TotalOUs) * 100) + "%") -PercentComplete ((($TotalOUs - $CurrentOUCount) / $TotalOUs) * 100) -ErrorAction SilentlyContinue
+
 	$LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
 	
 	if (($OU.linkedgrouppolicyobjects).length -lt 1)
@@ -858,7 +933,7 @@ if (($OUTable).Count -eq 0)
 #OUs with no GPO Linked
 $obj1 = [PSCustomObject]@{
 	
-	'Name'  = "OUs with no GPO's linked"
+	'Name'  = "OUs with no GPOs linked"
 	'Count' = $OUwithnoLink
 }
 
@@ -866,7 +941,7 @@ $OUGPOTable.Add($obj1)
 
 $obj2 = [PSCustomObject]@{
 	
-	'Name'  = "OUs with GPO's linked"
+	'Name'  = "OUs with GPOs linked"
 	'Count' = $OUwithLinked
 }
 
@@ -906,13 +981,13 @@ $UserPasswordNeverExpires = 0
 $ProtectedUsers = 0
 $NonProtectedUsers = 0
 
-$UsersWIthPasswordsExpiringInUnderAWeek = 0
-$UsersNotLoggedInOver30Days = 0
-$AccountsExpiringSoon = 0
+# $UsersWIthPasswordsExpiringInUnderAWeek = 0
+# $UsersNotLoggedInOver30Days = 0
+# $AccountsExpiringSoon = 0
 
 
 #Get users that haven't logged on in X amount of days, var is set at start of script
-$userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
+$Userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
 foreach ($User in $AllUsers)
 {
 	
@@ -937,7 +1012,7 @@ foreach ($User in $AllUsers)
 			#Check for Fine Grained Passwords
 			$PasswordPol = (Get-ADUserResultantPasswordPolicy $user)
 			
-			if (($PasswordPol) -ne $null)
+			if ($Null -ne ($PasswordPol))
 			{
 				
 				$maxPasswordAge = ($PasswordPol).MaxPasswordAge
@@ -957,7 +1032,7 @@ foreach ($User in $AllUsers)
 		$daystoexpire = "N/A"
 	}
 	
-	if (($User.Enabled -eq $True) -and ($AttVar.LastLogon -lt ((Get-Date).AddDays(- $Days))) -and ($User.LastLogon -ne $NULL))
+	if (($User.Enabled -eq $True) -and ($AttVar.LastLogon -lt ((Get-Date).AddDays(- $Days))) -and ($Null -ne $User.LastLogon))
 	{
 		
 		$obj = [PSCustomObject]@{
@@ -1021,7 +1096,7 @@ foreach ($User in $AllUsers)
 	$PasswordExpired = $AttVar.PasswordExpired
 	$PasswordLastSet = $AttVar.PasswordLastSet
 	$PasswordNeverExpires = $AttVar.PasswordNeverExpires
-	$daysUntilPWExpire = $daystoexpire
+#	$daysUntilPWExpire = $daystoexpire #Commented out because not in use
 	
 	$obj = [PSCustomObject]@{
 		
@@ -1176,10 +1251,14 @@ Write-Host "Done!" -ForegroundColor White
 Write-Host "Working on Group Policy Report..." -ForegroundColor Green
 
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TotalGPOs = $GPOs.Count
+$CurrentGPOCount = 0
 
 foreach ($GPO in $GPOs)
 {
 	
+	Write-Progress -Activity "Processing $($CurrentGPOCount++) of $($TotalGPOs) Group Policies..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalGPOs - $CurrentGPOCount) / $TotalGPOs) * 100) + "%") -PercentComplete ((($TotalGPOs - $CurrentGPOCount) / $TotalGPOs) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $GPO.DisplayName
@@ -1208,7 +1287,6 @@ Write-Host "Done!" -ForegroundColor White
 ############################>
 Write-Host "Working on Computers Report..." -ForegroundColor Green
 
-$Computers = Get-ADComputer -Filter * -Properties *
 $ComputersProtected = 0
 $ComputersNotProtected = 0
 $ComputerEnabled = 0
@@ -1231,9 +1309,14 @@ $OsVersions | ForEach-Object {
 
 }
 
+$TotalComputers = $Computers.Count
+$CurrentComputerCount = 0
+
 foreach ($Computer in $Computers)
 {
 	
+	Write-Progress -Activity "Processing $($CurrentComputerCount++) of $($TotalComputers) Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) + "%") -PercentComplete ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) -ErrorAction SilentlyContinue
+
 	if ($Computer.ProtectedFromAccidentalDeletion -eq $True)
 	{
 		

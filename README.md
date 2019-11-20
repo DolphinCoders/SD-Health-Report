@@ -1,20 +1,9 @@
-# PSHTML-AD-Report
-
-While I walk you through the report, you can view it for yourself [here](https://thelazyadministrator.com/wp-content/uploads/2018/12/4-12-2018-ADReport.html)
+# SD-Health-Report
 
 Interactive HTML report generated with PowerShell to give you an overview of your Active Directory enviornment. 
 
 Requires ReportHTML module but will attempt to install on first run. Requires ActiveDirectory module to be present. 
 
-[If you also want a VMWare report check out this fork](https://github.com/vhoudoverdov/PSHTML-AD-Report)
-
-![Overview](https://thelazyadministrator.com/wp-content/uploads/2018/12/groups.png)
-
-While I walk you through the report, you can view it for yourself [here](https://thelazyadministrator.com/wp-content/uploads/2018/12/4-12-2018-ADReport.html)
-
-[Blog Link](https://thelazyadministrator.com/2018/12/04/get-an-active-directory-interactive-html-report-with-powershell/)
-
-____
 # Report Features
 
 ## Pie Graphs
