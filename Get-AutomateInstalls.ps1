@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
   This function allows you to audit AD Computers or by using a list of computer names
-  to see if Labtech is installed on it to be printed to the screen or exported
+  to see if Automate is installed on it to be printed to the screen or exported
 .PARAMETER TransferInstall
   True if you wish to also transfer and install 
 .EXAMPLE
-  Check-ADLabtechInstalls -TransferInstall True
+  Check-ADAutomateInstalls -TransferInstall True
 #>
 
-Function Get-ADLabtechInstalls {
+Function Get-AutomateInstalls {
     [CmdletBinding()]
 	
     param (
@@ -17,19 +17,16 @@ Function Get-ADLabtechInstalls {
         [String[]]$ComputerNames,
 
         [Parameter()]
-        [Boolean]$TransferInstall,
+        [Boolean]$TransferInstall=$False,
 
         [Parameter()]
-        [String[]]$FiletoInstall="C:\reports\LabTech_Install.msi",
-		
-        [Parameter()]
-        [String[]]$LogFilePath="C:\reports\log.txt",
+        [String[]]$FiletoInstall="c:\reports\Automate_Install.msi",
 
         [Parameter()]
-        [String[]]$ReportFile="C:\reports\report.csv"
+        [String[]]$ExportFile="c:\reports\" + (Get-Date -f yyyy-MM-dd) + "\automate.csv"
 
-    )
-    
+	)
+	    
     Begin {
 	
         # Get Start Time so we can output how long it takes the script to run
@@ -44,7 +41,7 @@ Function Get-ADLabtechInstalls {
         $ComputersToCount = @()
 		
 		# Create the table used for output
-        $DisplayResults = New-Object System.Data.DataTable "ADComputersAndLabtech"
+        $DisplayResults = New-Object System.Data.DataTable "ADComputersAutomate"
         $col1 = New-Object System.Data.DataColumn Name
         $col2 = New-Object System.Data.DataColumn WinRM
         $col3 = New-Object System.Data.DataColumn PSSession
@@ -60,38 +57,21 @@ Function Get-ADLabtechInstalls {
         $DisplayResults.Columns.Add($col5)
         $DisplayResults.Columns.Add($col6)
         $DisplayResults.Columns.Add($col7)
-        $DisplayResults.Columns.Add($col8)
-		
-		# Checks if the log file path exists, if not it creates it
-		$CheckLogPath = Test-Path $LogFile -ErrorAction SilentlyContinue
-		If ($CheckLogPath -eq $False)
-		{
-			Write-Verbose "Log Path not found! - Creating!"
-			New-Item -Path $LogFile -Force -ItemType File
-		}
-		Else
-		{
-			Write-Verbose "Log file path is already present, continuing"
-		}
+		$DisplayResults.Columns.Add($col8)
 
-		# Checks if the report file path exists, if not it creates it
-		$CheckReportPath = Test-Path $ReportFile -ErrorAction SilentlyContinue
-		If ($CheckReportPath -eq $False)
-		{
-			Write-Verbose "Report Path not found! - Creating!"
-			New-Item -Path $ReportFile -Force -ItemType File
-		}
-		Else
-		{
-			Write-Verbose "Report file path is already present, continuing"
-		}
+		CheckPathExists($ReportFile, "Report")
 		
     }
 
     Process {
 
-		# Computers piped in will all go through the same process as using the parameter
-        $ComputersToCount += $ComputerNames
+		# If nothing was passed through, grab all AD computers
+		If ($Null -eq $ComputerNames) {
+			$ComputersToCount += (Get-ADComputer -Filter * -Properties *).Name
+		} else {
+			# Computers piped in will all go through the same process as using the parameter
+			$ComputersToCount += $ComputerNames
+		}
 
     }
 
@@ -154,7 +134,7 @@ Function Get-ADLabtechInstalls {
 				}	
                 
 		        # Test WinRM, if this fails we can't perform any other tasks
-		        Write-Verbose "Testing WSMAN Connection to $Computer"
+		        Write-Host "Testing WSMAN Connection to $Computer"
 				Try {
 				    $Heartbeat = (Test-WSMan -ComputerName $Computer -ErrorAction SilentlyContinue)
 				}
@@ -163,7 +143,7 @@ Function Get-ADLabtechInstalls {
 				}
 		        If (!$Heartbeat)
 		        {
-			        Write-Verbose "$Computer is not able to be connected to via WinRM"
+			        Write-Host "$Computer is not able to be connected to via WinRM"
                     $ComputersNoWinRM += $Computer
                     $ComputerRow.WinRM = $False 
                     $ComputerRow.PSSession = "Unknown"
@@ -172,59 +152,59 @@ Function Get-ADLabtechInstalls {
 		        }
 		        Else
 		        {
-			        Write-Verbose "WinRM appears to be open for $Computer"
+			        Write-Host "WinRM appears to be open for $Computer"
                     $ComputerRow.WinRM = $True
 					
 			        # Runs the exe in silent mode. Please note that when PowerShell runs the .exe file you wont see it if youre logged in as a user anyways because it wont launch it in an interactive login by default
 			
-			        Write-Verbose "Creating a new PSSession to $Computer"
+			        Write-Host "Creating a new PSSession to $Computer"
 			        $session = New-PSSession -ComputerName $computer -ErrorAction SilentlyContinue
 			        If ($null -ne $Session)
 			        {
                         $ComputerRow.PSSession = $True 
-				        Write-Verbose "Creating a new PSDrive on $Computer"
+				        Write-Host "Creating a new PSDrive on $Computer"
 				        Invoke-Command -Session $session -ScriptBlock { New-PSDrive -PSProvider registry -Root HKEY_CLASSES_ROOT -Name HKCR } | Out-Null
 				
-				        Write-Verbose "Checking to see if LabTech is installed"
-				        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*LabTech*" } }
+				        Write-Host "Checking to see if Automate is installed"
+				        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*Automate*" } }
 				        If ($null -ne $Check)
 				        {
-					        Write-Verbose "$Computer has LabTech Installed!"
+					        Write-Host "$Computer has Automate Installed!"
                             $ComputersAlreadyInstalled += $Computer
                             $ComputerRow.AlreadyInstalled = $True
                             $ComputerRow.TransferInstall = $False
 				        }
 				        Else
 				        {
-					        Write-Verbose "$Computer does not currently have LabTech installed! Continuing"
+					        Write-Host "$Computer does not currently have Automate installed! Continuing"
                             If($TransferInstall)
                             {
                                 $ComputerRow.AlreadyInstalled = $False
-					            Write-Verbose "Creating C:\temp\ on $Computer"
+					            Write-Host "Creating C:\temp\ on $Computer"
 					            #Creates a directory on the remote machine 
 					            Invoke-Command -Session $session -ScriptBlock { New-Item -ItemType Directory "C:\temp" -ErrorAction SilentlyContinue } | Out-Null
-					            Write-Verbose "Done!"
+					            Write-Host "Done!"
 					            Do
 					                                                                                                                                                                                                                                            {
-						        Write-Verbose "Copying over the Windows Agent File to $Computer..."
+						        Write-Host "Copying over the Windows Agent File to $Computer..."
 						        #Copies over the file to our new directory we created above
 						        Copy-Item -Path $FiletoInstall -Destination "\\$computer\C$\temp\" -Force -ErrorAction Continue
-						        Write-Verbose "Done!"
+						        Write-Host "Done!"
 						
-						        $CheckforFile = Invoke-Command -Session $session -ScriptBlock { Test-Path -Path C:\temp\LabTech_Install.msi }
+						        $CheckforFile = Invoke-Command -Session $session -ScriptBlock { Test-Path -Path C:\temp\Automate_Install.msi }
 						        If ($CheckforFile -eq $True)
 						        {
 							        $CopyCode++
 							        Do
 							        {
-								        Write-Verbose "Installing the agent on $Computer..."
-								        Invoke-Command -Session $session -ScriptBlock { Start-Process "msiexec.exe" -ArgumentList "/i C:\temp\LabTech_Install.msi /q" -Wait }
+								        Write-Host "Installing the agent on $Computer..."
+								        Invoke-Command -Session $session -ScriptBlock { Start-Process "msiexec.exe" -ArgumentList "/i C:\temp\Automate_Install.msi /q" -Wait }
 								
-								        Write-Verbose "Checking to see if LabTech is installed"
-								        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*LabTech*" } }
+								        Write-Host "Checking to see if Automate is installed"
+								        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*Automate*" } }
 								        if ($null -ne $Check)
 								        {
-									        Write-Verbose "$Computer has $LabTech Installed!"
+									        Write-Host "$Computer has $Automate Installed!"
 									        #Adds 1 to the variable to keep track of how many computers don't have the path and will be worked on
 									        $ComputersScriptInstalled += $Computer					
 									        $InstallCode++
@@ -233,11 +213,11 @@ Function Get-ADLabtechInstalls {
 								        Else
 								        {
 									        $Retry++
-									        Write-Verbose "Install Failed"
+									        Write-Host "Install Failed"
 									        #Adds 1 to the variable to keep track of how many computers don't have the path and will be worked on
 									        If ($Retry -eq 1)
 									        {
-										        Write-Verbose "Retrying install of LabTech on $Computer"
+										        Write-Host "Retrying install of Automate on $Computer"
 									        }
 								        }
 							        }
@@ -245,21 +225,21 @@ Function Get-ADLabtechInstalls {
 							        Until (($Retry -gt 3) -or ($InstallCode -gt 0))
                                     If(($Retry -gt 3) -or ($InstallCode -gt 0))
                                     {
-                                        Write-Verbose "Uninstall failed on $Computer"
+                                        Write-Host "Uninstall failed on $Computer"
                                         $ComputerRow.TransferInstall = "Attemped"
                                     }
 							
-							        Write-Verbose "Exiting pssession"
+							        Write-Host "Exiting pssession"
 							        Get-PSSession -Name $Session.Name | Remove-PSSession -ErrorAction SilentlyContinue
 							
 						        }
 						        Else
 						        {
 							        $RetryCopyFile++
-							        Write-Verbose "Could not copy install files to $Computer"
+							        Write-Host "Could not copy install files to $Computer"
 							        If ($RetryCopyFile -eq 1)
 							        {
-								        Write-Verbose "Retrying to copy install files to $Computer"
+								        Write-Host "Retrying to copy install files to $Computer"
 							        }
 						        }
 					        }
@@ -275,14 +255,14 @@ Function Get-ADLabtechInstalls {
 			        }
 			        Else
 			        {
-				        Write-Verbose "Could not establish a PSSession to $Computer!"
+				        Write-Host "Could not establish a PSSession to $Computer!"
                         $ComputersNoPSSession += $Computer
                         $ComputerRow.PSSession = $False
                         $ComputerRow.AlreadyInstalled = "Unknown"
                         $ComputerRow.TransferInstall = $False
 			        }
 		        }
-                Write-Verbose "Removing any ghost PSSessions"
+                Write-Host "Removing any ghost PSSessions"
                 Get-PSSession | Remove-PSSession -ErrorAction SilentlyContinue
                 $Iteration++
                 $DisplayResults.Rows.Add($ComputerRow)
@@ -307,7 +287,21 @@ Function Get-ADLabtechInstalls {
         Write-Host "COMPUTERS INSTALLED SUCESSFULLY: " ($ComputersScriptInstalled).Count -ForegroundColor Green
         Write-Host "COMPUTERS ALREADY INSTALLED: " ($ComputersAlreadyInstalled).Count -ForegroundColor Green
 
-        $DisplayResults | Export-csv -Path $ReportFile -NoTypeInformation
+        $DisplayResults | Format-Table | Export-csv -Path $ReportFile -NoTypeInformation
 
     }
+}
+
+Function CheckPathExists($Path, $File) {
+	# Checks if the report file path exists, if not it creates it
+	$CheckReportPath = Test-Path $Path -ErrorAction SilentlyContinue
+	If ($CheckReportPath -eq $False)
+	{
+		Write-Host "$File path not found! - Creating $Path!"
+		New-Item -Path $Path -Force -ItemType File | Out-Null
+	}
+	Else
+	{
+		Write-Host "$File file path is already present, continuing"
+	}
 }

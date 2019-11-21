@@ -57,19 +57,19 @@ param (
 	
 	#Company logo that will be displayed on the left, can be URL or UNC
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
-	[String]$CompanyLogo = "",
+	[String]$CompanyLogo = "https://lt.smartdolphins.com/WCC2/images/logo.png",
 	#Logo that will be on the right side, UNC or URL
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
-	[String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
+	[String]$RightLogo = "",
 	#Title of generated report
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
-	[String]$ReportTitle = "Active Directory Report",
+	[String]$ReportTitle = "SD Health Report",
 	#Location the report will be saved to
 
-	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Automation\")]
-	[String]$ReportSavePath = "C:\Automation\",
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Reports\")]
+	[String]$ReportSavePath = "c:\reports\" + (Get-Date -f yyyy-MM-dd) + "\",
 	#Find users that have not logged in X Amount of days, this sets the days
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged on in more than [X] days. amount of days; Default: 30")]
@@ -77,7 +77,7 @@ param (
 	#Get users who have been created in X amount of days and less
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
-	$UserCreatedDays = 7,
+	$UserCreatedDays = 30,
 	#Get users whos passwords expire in less than X amount of days
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users password expires within [X] amount of days; Default: 7")]
@@ -90,6 +90,17 @@ param (
 	#CSS template located C:\Program Files\WindowsPowerShell\Modules\ReportHTML\1.4.1.1\
 	#Default template is orange and named "Sample"
 )
+
+#Check for ReportHTML Module
+$Mod = Get-Module -ListAvailable -Name "ReportHTML"
+
+If ($null -eq $Mod)
+{	
+	Write-Host "ReportHTML Module is not present, attempting to install it"
+	
+	Install-Module -Name ReportHTML -Force
+	Import-Module ReportHTML -ErrorAction SilentlyContinue
+}
 
 Write-Host "Gathering Report Customization..." -ForegroundColor White
 Write-Host "__________________________________" -ForegroundColor White
@@ -121,18 +132,6 @@ function LastLogonConvert ($ftDate)
 	}
 	
 } #End function LastLogonConvert
-
-#Check for ReportHTML Module
-$Mod = Get-Module -ListAvailable -Name "ReportHTML"
-
-If ($null -eq $Mod)
-{
-	
-	Write-Host "ReportHTML Module is not present, attempting to install it"
-	
-	Install-Module -Name ReportHTML -Force
-	Import-Module ReportHTML -ErrorAction SilentlyContinue
-}
 
 #Array of default Security Groups
 $DefaultSGs = @(
