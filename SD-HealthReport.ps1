@@ -58,32 +58,32 @@ param (
 	#Company logo that will be displayed on the left, can be URL or UNC
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
 	[String]$CompanyLogo = "https://lt.smartdolphins.com/WCC2/images/logo.png",
+	
 	#Logo that will be on the right side, UNC or URL
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
 	[String]$RightLogo = "",
+	
 	#Title of generated report
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
 	[String]$ReportTitle = "SD Health Report",
+	
 	#Location the report will be saved to
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Reports\")]
 	[String]$ReportSavePath = "c:\reports\" + (Get-Date -f yyyy-MM-dd) + "\",
+	
 	#Find users that have not logged in X Amount of days, this sets the days
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged on in more than [X] days. amount of days; Default: 30")]
 	$Days = 30,
+	
 	#Get users who have been created in X amount of days and less
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
 	$UserCreatedDays = 30,
+	
 	#Get users whos passwords expire in less than X amount of days
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users password expires within [X] amount of days; Default: 7")]
 	$DaysUntilPWExpireINT = 7,
+	
 	#Get AD Objects that have been modified in X days and newer
-
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "AD Objects that have been modified within [X] amount of days; Default: 3")]
 	$ADModNumber = 3
 	
@@ -220,9 +220,6 @@ $TOPUserTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
-
-#Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
-# $AllUsers = Get-ADUser -Filter * -Properties *
 
 #Retrieve all known Domain Controllers
 $DCs = (Get-ADDomainController -Filter *).Name
@@ -467,7 +464,7 @@ foreach ($DefaultComputer in $DefaultComputers)
 		'Name' = $DefaultComputer.Name
 		'Enabled' = $DefaultComputer.Enabled
 		'Operating System' = $DefaultComputer.OperatingSystem
-		'Modified Date' = $DefaultComputer.Modified
+		'Modified Date' = $DefaultComputer.Modified.ToString("yyyy-MM-dd")
 		'Password Last Set' = $DefaultComputer.PasswordLastSet
 		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
 	}

@@ -60,7 +60,7 @@ Function Get-AutomateInstalls {
 		$DisplayResults.Columns.Add($col8)
 
 		CheckPathExists $ExportFile "Export"
-		
+
     }
 
     Process {
