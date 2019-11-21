@@ -287,7 +287,7 @@ Function Get-AutomateInstalls {
         Write-Host "COMPUTERS INSTALLED SUCESSFULLY: " ($ComputersScriptInstalled).Count -ForegroundColor Green
         Write-Host "COMPUTERS ALREADY INSTALLED: " ($ComputersAlreadyInstalled).Count -ForegroundColor Green
 
-        $DisplayResults | Format-Table | Export-csv -Path $ExportFile -NoTypeInformation
+        $DisplayResults | Export-csv -Path $ExportFile -NoTypeInformation
 
     }
 }

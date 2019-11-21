@@ -69,7 +69,7 @@ param (
 	
 	#Location the report will be saved to
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Reports\")]
-	[String]$ReportSavePath = "c:\reports\" + (Get-Date -f yyyy-MM-dd) + "\",
+	[String]$ReportSavePath = "c:\reports\" + (Get-Date -f 'yyyy-MM-dd') + "\",
 	
 	#Find users that have not logged in X Amount of days, this sets the days
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged on in more than [X] days. amount of days; Default: 30")]
@@ -128,7 +128,7 @@ function LastLogonConvert ($ftDate)
 	else
 	{
 		
-		$Date
+		$Date.ToString('yyyy-MM-dd hh:mm:ss tt')
 	}
 	
 } #End function LastLogonConvert
@@ -464,7 +464,7 @@ foreach ($DefaultComputer in $DefaultComputers)
 		'Name' = $DefaultComputer.Name
 		'Enabled' = $DefaultComputer.Enabled
 		'Operating System' = $DefaultComputer.OperatingSystem
-		'Modified Date' = $DefaultComputer.Modified.ToString("yyyy-MM-dd")
+		'Modified Date' = $DefaultComputer.Modified.ToString("yyyy-MM-dd hh:mm:ss tt")
 		'Password Last Set' = $DefaultComputer.PasswordLastSet
 		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
 	}
@@ -483,7 +483,7 @@ if (($DefaultComputersinDefaultOUTable).Count -eq 0)
 }
 
 $DefaultUsersOU = (Get-ADDomain).UsersContainer
-$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'LastLogon'; Expression = { LastLogonConvert $_.LastLogon } }, DistinguishedName
 
 $TotalDefaultUsers = $DefaultUsers.Count
 $CurrentDefaultUserCount = 0
@@ -987,7 +987,7 @@ $Userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[
 foreach ($User in $AllUsers)
 {
 	
-	$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+	$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'LastLogon'; Expression = { LastLogonConvert $_.LastLogon } }, DistinguishedName
 	$maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge.Days
 	
 	if ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false))
@@ -1037,7 +1037,7 @@ foreach ($User in $AllUsers)
 			'UserPrincipalName' = $User.UserPrincipalName
 			'Enabled' = $AttVar.Enabled
 			'Protected from Deletion' = $User.ProtectedFromAccidentalDeletion
-			'Last Logon' = $AttVar.lastlogon
+			'Last Logon' = $AttVar.LastLogon
 			'Password Never Expires' = $AttVar.PasswordNeverExpires
 			'Days Until Password Expires' = $daystoexpire
 		}
@@ -1092,6 +1092,7 @@ foreach ($User in $AllUsers)
 	$PasswordExpired = $AttVar.PasswordExpired
 	$PasswordLastSet = $AttVar.PasswordLastSet
 	$PasswordNeverExpires = $AttVar.PasswordNeverExpires
+	$LastLogon = $AttVar.LastLogon
 #	$daysUntilPWExpire = $daystoexpire #Commented out because not in use
 	
 	$obj = [PSCustomObject]@{
@@ -1106,7 +1107,7 @@ foreach ($User in $AllUsers)
 		'Change Password Next Logon' = $PasswordExpired
 		'Password Last Set'	      = $PasswordLastSet
 		'Password Never Expires'  = $PasswordNeverExpires
-		'Days Until Password Expires' = $daystoexpire
+		'Days Until Password Expires' = $DaysToExpire
 	}
 	
 	$usertable.Add($obj)
@@ -1342,8 +1343,8 @@ foreach ($Computer in $Computers)
 		'Name' = $Computer.Name
 		'Enabled' = $Computer.Enabled
 		'Operating System' = $Computer.OperatingSystem
-		'Modified Date' = $Computer.Modified.ToString("yyyy-MM-dd")
-		'Last Logon' = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('yyyy-MM-dd') 
+		'Modified Date' = $Computer.Modified.ToString("yyyy-MM-dd hh:mm:ss tt")
+		'Last Logon' = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('yyyy-MM-dd hh:mm:ss tt') 
 		'Password Last Set' = $Computer.PasswordLastSet
 		'Protect from Deletion' = $Computer.ProtectedFromAccidentalDeletion
 		
