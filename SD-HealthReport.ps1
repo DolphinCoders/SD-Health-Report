@@ -351,7 +351,7 @@ if (($CompanyInfoTable).Count -eq 0)
 $When = ((Get-Date).AddDays(- $UserCreatedDays)).Date
 $NewUsers = $AllUsers | Where-Object { $_.whenCreated -ge $When }
 
-$TotalNewUsers = $NewUsers.Count
+$TotalNewUsers = @($NewUsers).Count
 $CurrentUserCount = 0
 
 foreach ($Newuser in $Newusers)
@@ -363,7 +363,7 @@ foreach ($Newuser in $Newusers)
 		
 		'Name' = $Newuser.Name
 		'Enabled' = $Newuser.Enabled
-		'Creation Date' = $Newuser.whenCreated
+		'Creation Date' = $Newuser.WhenCreated
 	}
 	
 	$NewCreatedUsersTable.Add($obj)
@@ -465,7 +465,6 @@ foreach ($DefaultComputer in $DefaultComputers)
 		'Enabled' = $DefaultComputer.Enabled
 		'Operating System' = $DefaultComputer.OperatingSystem
 		'Modified Date' = $DefaultComputer.Modified.ToString("yyyy-MM-dd")
-		'Last Logon' = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('g') 
 		'Password Last Set' = $DefaultComputer.PasswordLastSet
 		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
 	}
@@ -1343,9 +1342,11 @@ foreach ($Computer in $Computers)
 		'Name' = $Computer.Name
 		'Enabled' = $Computer.Enabled
 		'Operating System' = $Computer.OperatingSystem
-		'Modified Date' = $Computer.Modified
+		'Modified Date' = $Computer.Modified.ToString("yyyy-MM-dd")
+		'Last Logon' = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('yyyy-MM-dd') 
 		'Password Last Set' = $Computer.PasswordLastSet
 		'Protect from Deletion' = $Computer.ProtectedFromAccidentalDeletion
+		
 	}
 	
 	$ComputersTable.Add($obj)
