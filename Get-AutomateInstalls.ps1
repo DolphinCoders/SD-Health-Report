@@ -55,11 +55,11 @@ Function Get-AutomateInstalls {
         $DisplayResults.Columns.Add($col3)
         $DisplayResults.Columns.Add($col4)
         $DisplayResults.Columns.Add($col5)
-        $DisplayResults.Columns.Add($col6)
-        $DisplayResults.Columns.Add($col7)
+    	$DisplayResults.Columns.Add($col6)
+		$DisplayResults.Columns.Add($col7)
 		$DisplayResults.Columns.Add($col8)
 
-		CheckPathExists($ReportFile, "Report")
+		CheckPathExists $ExportFile "Export"
 		
     }
 
@@ -287,7 +287,7 @@ Function Get-AutomateInstalls {
         Write-Host "COMPUTERS INSTALLED SUCESSFULLY: " ($ComputersScriptInstalled).Count -ForegroundColor Green
         Write-Host "COMPUTERS ALREADY INSTALLED: " ($ComputersAlreadyInstalled).Count -ForegroundColor Green
 
-        $DisplayResults | Format-Table | Export-csv -Path $ReportFile -NoTypeInformation
+        $DisplayResults | Format-Table | Export-csv -Path $ExportFile -NoTypeInformation
 
     }
 }
