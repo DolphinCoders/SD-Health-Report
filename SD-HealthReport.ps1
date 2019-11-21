@@ -465,6 +465,7 @@ foreach ($DefaultComputer in $DefaultComputers)
 		'Enabled' = $DefaultComputer.Enabled
 		'Operating System' = $DefaultComputer.OperatingSystem
 		'Modified Date' = $DefaultComputer.Modified.ToString("yyyy-MM-dd")
+		'Last Logon' = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('g') 
 		'Password Last Set' = $DefaultComputer.PasswordLastSet
 		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
 	}

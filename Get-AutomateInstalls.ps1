@@ -20,10 +20,10 @@ Function Get-AutomateInstalls {
         [Boolean]$TransferInstall=$False,
 
         [Parameter()]
-        [String[]]$FiletoInstall="c:\reports\Automate_Install.msi",
+        [String]$FiletoInstall="c:\reports\Automate_Install.msi",
 
         [Parameter()]
-        [String[]]$ExportFile="c:\reports\" + (Get-Date -f yyyy-MM-dd) + "\automate.csv"
+        [String]$ExportFile="c:\reports\" + (Get-Date -f yyyy-MM-dd) + "\automate.csv"
 
 	)
 	    
