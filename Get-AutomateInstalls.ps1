@@ -166,7 +166,7 @@ Function Get-AutomateInstalls {
 				        Invoke-Command -Session $session -ScriptBlock { New-PSDrive -PSProvider registry -Root HKEY_CLASSES_ROOT -Name HKCR } | Out-Null
 				
 				        Write-Host "Checking to see if Automate is installed"
-				        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*Automate*" } }
+				        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*Labtech*" } }
 				        If ($null -ne $Check)
 				        {
 					        Write-Host "$Computer has Automate Installed!"
@@ -201,7 +201,7 @@ Function Get-AutomateInstalls {
 								        Invoke-Command -Session $session -ScriptBlock { Start-Process "msiexec.exe" -ArgumentList "/i C:\temp\Automate_Install.msi /q" -Wait }
 								
 								        Write-Host "Checking to see if Automate is installed"
-								        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*Automate*" } }
+								        $Check = Invoke-Command -Session $session -ScriptBlock { (Get-ChildItem "HKCR:\Installer\Products") | Where-Object { $_.GetValue("ProductName") -like "*Labtech*" } }
 								        if ($null -ne $Check)
 								        {
 									        Write-Host "$Computer has $Automate Installed!"
