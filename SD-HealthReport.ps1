@@ -133,6 +133,29 @@ function LastLogonConvert ($ftDate)
 	
 } #End function LastLogonConvert
 
+Function Update-Progress($Title, $Percent) {
+	if ($Percent -eq 100) {
+			Write-Progress -Activity "$Title" -Status "Ready" -Completed
+	} else {
+			Write-Progress -Activity "$Title" -Status "($Percent% Complete: " -PercentComplete $Percent;
+	}
+
+}
+
+Function CheckPathExists($Path, $File) {
+	# Checks if the report file path exists, if not it creates it
+	$CheckReportPath = Test-Path $Path -ErrorAction SilentlyContinue
+	If ($CheckReportPath -eq $False)
+	{
+		Write-Host "$File path not found! - Creating $Path!"
+		New-Item -Path $Path -Force -ItemType Directory | Out-Null
+	}
+	Else
+	{
+		Write-Host "$File file path is already present, continuing"
+	}
+}
+
 #Array of default Security Groups
 $DefaultSGs = @(
 	
@@ -221,6 +244,8 @@ $TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 
+CheckPathExists $ReportSavePath "Report Directory"
+
 #Retrieve all known Domain Controllers
 $DCs = (Get-ADDomainController -Filter *).Name
 
@@ -264,7 +289,12 @@ $TotalADObjs = $ADObjs.Count
 
 foreach ($ADObj in $ADObjs)
 {
-	Write-Progress -Activity "Processing $($CurrentADObjs++) of $($TotalADObjs) AD Objects..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalADObjs - $CurrentADObjs) / $TotalADObjs) * 100) + "%") -PercentComplete ((($TotalADObjs - $CurrentADObjs) / $TotalADObjs) * 100) -ErrorAction SilentlyContinue
+
+	$Title = "Processing $($CurrentADObjs++) of $($TotalADObjs) AD Objects..."
+	$Percent = [math]::Round($CurrentADObjs / $TotalADObjs * 100, 2)
+	Update-Progress $Title $Percent
+ 
+#	Write-Progress -Activity "Processing $($CurrentADObjs++) of $($TotalADObjs) AD Objects..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalADObjs - $CurrentADObjs) / $TotalADObjs) * 100) + "%") -PercentComplete ((($TotalADObjs - $CurrentADObjs) / $TotalADObjs) * 100) -ErrorAction SilentlyContinue
 	
 	if ($ADObj.ObjectClass -eq "GroupPolicyContainer")
 	{
@@ -356,8 +386,12 @@ $CurrentUserCount = 0
 
 foreach ($Newuser in $Newusers)
 {
-	
-	Write-Progress -Activity "Processing $($CurrentUserCount++) of $($TotalNewUsers) New Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalNewUsers - $CurrentUserCount) / $TotalNewUsers) * 100) + "%") -PercentComplete ((($TotalNewUsers - $CurrentUserCount) / $TotalNewUsers) * 100) -ErrorAction SilentlyContinue
+
+	$Title = "Processing $($CurrentUserCount++) of $($TotalNewUsers) New Users..."
+	$Percent = [math]::Round($CurrentUserCount / $TotalNewUsers * 100, 2)
+	Update-Progress $Title $Percent
+
+	#Write-Progress -Activity "Processing $($CurrentUserCount++) of $($TotalNewUsers) New Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalNewUsers - $CurrentUserCount) / $TotalNewUsers) * 100) + "%") -PercentComplete ((($TotalNewUsers - $CurrentUserCount) / $TotalNewUsers) * 100) -ErrorAction SilentlyContinue
 
 	$obj = [PSCustomObject]@{
 		
@@ -388,8 +422,10 @@ $CurrentAdminCount = 0
 
 foreach ($DomainAdminMember in $DomainAdminMembers)
 {
-	
-	Write-Progress -Activity "Processing $($CurrentAdminCount++) of $($TotalAdmins) Domain Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalAdmins - $CurrentAdminCount) / $TotalAdmins) * 100) + "%") -PercentComplete ((($TotalAdmins - $CurrentAdminCount) / $TotalAdmins) * 100) -ErrorAction SilentlyContinue	
+	$Title = "Processing $($CurrentAdminCount++) of $($TotalAdmins) Domain Admins..."
+	$Percent = [math]::Round($CurrentAdminCount / $TotalAdmins * 100, 2)
+	Update-Progress $Title $Percent
+	#Write-Progress -Activity "Processing $($CurrentAdminCount++) of $($TotalAdmins) Domain Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalAdmins - $CurrentAdminCount) / $TotalAdmins) * 100) + "%") -PercentComplete ((($TotalAdmins - $CurrentAdminCount) / $TotalAdmins) * 100) -ErrorAction SilentlyContinue	
 	
 	$Name = $DomainAdminMember.Name
 	$Type = $DomainAdminMember.ObjectClass
@@ -423,7 +459,10 @@ $CurrentEnterpriseAdmin = 0
 
 foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 {
-	Write-Progress -Activity "Processing $($CurrentEnterpriseAdmin++) of $($TotalEnterpriseAdmins) Enterprise Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalEnterpriseAdmins - $CurrentEnterpriseAdmin) / $TotalEnterpriseAdmins) * 100) + "%") -PercentComplete ((($TotalEnterpriseAdmins - $CurrentEnterpriseAdmin) / $TotalEnterpriseAdmins) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentEnterpriseAdmin++) of $($TotalEnterpriseAdmins) Enterprise Admins..."
+	$Percent = [math]::Round($CurrentEnterpriseAdmin / $TotalEnterpriseAdmins * 100, 2)
+	Update-Progress $Title $Percent	
+#	Write-Progress -Activity "Processing $($CurrentEnterpriseAdmin++) of $($TotalEnterpriseAdmins) Enterprise Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalEnterpriseAdmins - $CurrentEnterpriseAdmin) / $TotalEnterpriseAdmins) * 100) + "%") -PercentComplete ((($TotalEnterpriseAdmins - $CurrentEnterpriseAdmin) / $TotalEnterpriseAdmins) * 100) -ErrorAction SilentlyContinue
 
 	$Name = $EnterpriseAdminsMember.Name
 	$Type = $EnterpriseAdminsMember.ObjectClass
@@ -457,7 +496,10 @@ $CurrentComputerCount = 0
 
 foreach ($DefaultComputer in $DefaultComputers)
 {
-	Write-Progress -Activity "Processing $($CurrentComputerCount++) of $($TotalComputers) Default Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) + "%") -PercentComplete ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentComputerCount++) of $($TotalComputers) Default Computers..."
+	$Percent = [math]::Round($CurrentComputerCount / $TotalComputers * 100, 2)
+	Update-Progress $Title $Percent
+	#Write-Progress -Activity "Processing $($CurrentComputerCount++) of $($TotalComputers) Default Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) + "%") -PercentComplete ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) -ErrorAction SilentlyContinue
 
 	$obj = [PSCustomObject]@{
 		
@@ -491,7 +533,11 @@ $CurrentDefaultUserCount = 0
 foreach ($DefaultUser in $DefaultUsers)
 {
 	
-	Write-Progress -Activity "Processing $($CurrentDefaultUserCount++) of $($TotalDefaultUsers) Default Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalDefaultUsers - $CurrentDefaultUserCount) / $TotalDefaultUsers) * 100) + "%") -PercentComplete ((($TotalDefaultUsers - $CurrentDefaultUserCount) / $TotalDefaultUsers) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentDefaultUserCount++) of $($TotalDefaultUsers) Default Users..."
+	$Percent = [math]::Round($CurrentDefaultUserCount / $TotalDefaultUsers * 100, 2)
+	Update-Progress $Title $Percent
+
+#	Write-Progress -Activity "Processing $($CurrentDefaultUserCount++) of $($TotalDefaultUsers) Default Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalDefaultUsers - $CurrentDefaultUserCount) / $TotalDefaultUsers) * 100) + "%") -PercentComplete ((($TotalDefaultUsers - $CurrentDefaultUserCount) / $TotalDefaultUsers) * 100) -ErrorAction SilentlyContinue
 
 	$obj = [PSCustomObject]@{
 		
@@ -524,8 +570,11 @@ $CurrentLooseUserCount = 0
 
 foreach ($LooseUser in $LooseUsers)
 {
-	
-	Write-Progress -Activity "Processing $($CurrentLooseUserCount++) of $($TotalLooseUsers) Loose Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalLooseUsers - $CurrentLooseUserCount) / $TotalLooseUsers) * 100) + "%") -PercentComplete ((($TotalLooseUsers - $CurrentLooseUserCount) / $TotalLooseUsers) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentLooseUserCount++) of $($TotalLooseUsers) Loose Users..."
+	$Percent = [math]::Round($CurrentLooseUserCount / $TotalLooseUsers * 100, 2)
+	Update-Progress $Title $Percent
+
+	#Write-Progress -Activity "Processing $($CurrentLooseUserCount++) of $($TotalLooseUsers) Loose Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalLooseUsers - $CurrentLooseUserCount) / $TotalLooseUsers) * 100) + "%") -PercentComplete ((($TotalLooseUsers - $CurrentLooseUserCount) / $TotalLooseUsers) * 100) -ErrorAction SilentlyContinue
 	
 	$NameLoose = $LooseUser.Name
 	$UPNLoose = $LooseUser.UserPrincipalName
@@ -629,11 +678,14 @@ $GroupsNotProtected = 0
 $TotalGroups = $Groups.Count
 $CurrentGroupCount = 0
 
-
 foreach ($Group in $Groups)
 {
 	
-	Write-Progress -Activity "Processing $($CurrentGroupCount++) of $($TotalGroups) Security Groups..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalGroups - $CurrentGroupCount) / $TotalGroups) * 100) + "%") -PercentComplete ((($TotalGroups - $CurrentGroupCount) / $TotalGroups) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentGroupCount++) of $($TotalGroups) Total Groups..."
+	$Percent = [math]::Round($CurrentGroupCount / $TotalGroups * 100, 2)
+	Update-Progress $Title $Percent
+
+#	Write-Progress -Activity "Processing $($CurrentGroupCount++) of $($TotalGroups) Security Groups..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalGroups - $CurrentGroupCount) / $TotalGroups) * 100) + "%") -PercentComplete ((($TotalGroups - $CurrentGroupCount) / $TotalGroups) * 100) -ErrorAction SilentlyContinue
 
 	$DefaultADGroup = 'False'
 	$Type = New-Object 'System.Collections.Generic.List[System.Object]'
@@ -865,8 +917,12 @@ $CurrentOUCount = 0
 
 foreach ($OU in $OUs)
 {
+
+	$Title = "Processing $($CurrentOUCount++) of $($TotalOUs) Total OUs..."
+	$Percent = [math]::Round($CurrentOUCount / $TotalOUs * 100, 2)
+	Update-Progress $Title $Percent
 	
-	Write-Progress -Activity "Processing $($CurrentOUCount++) of $($TotalOUs) Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalOUs - $CurrentOUCount) / $TotalOUs) * 100) + "%") -PercentComplete ((($TotalOUs - $CurrentOUCount) / $TotalOUs) * 100) -ErrorAction SilentlyContinue
+	#Write-Progress -Activity "Processing $($CurrentOUCount++) of $($TotalOUs) Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalOUs - $CurrentOUCount) / $TotalOUs) * 100) + "%") -PercentComplete ((($TotalOUs - $CurrentOUCount) / $TotalOUs) * 100) -ErrorAction SilentlyContinue
 
 	$LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
 	
@@ -1254,7 +1310,11 @@ $CurrentGPOCount = 0
 foreach ($GPO in $GPOs)
 {
 	
-	Write-Progress -Activity "Processing $($CurrentGPOCount++) of $($TotalGPOs) Group Policies..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalGPOs - $CurrentGPOCount) / $TotalGPOs) * 100) + "%") -PercentComplete ((($TotalGPOs - $CurrentGPOCount) / $TotalGPOs) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentGPOCount++) of $($TotalGPOs) Total GPOs..."
+	$Percent = [math]::Round($CurrentGPOCount / $TotalGPOs * 100, 2)
+	Update-Progress $Title $Percent
+
+#	Write-Progress -Activity "Processing $($CurrentGPOCount++) of $($TotalGPOs) Group Policies..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalGPOs - $CurrentGPOCount) / $TotalGPOs) * 100) + "%") -PercentComplete ((($TotalGPOs - $CurrentGPOCount) / $TotalGPOs) * 100) -ErrorAction SilentlyContinue
 
 	$obj = [PSCustomObject]@{
 		
@@ -1311,8 +1371,11 @@ $CurrentComputerCount = 0
 
 foreach ($Computer in $Computers)
 {
-	
-	Write-Progress -Activity "Processing $($CurrentComputerCount++) of $($TotalComputers) Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) + "%") -PercentComplete ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) -ErrorAction SilentlyContinue
+	$Title = "Processing $($CurrentComputerCount++) of $($TotalComputers) Total Computers..."
+	$Percent = [math]::Round($CurrentComputerCount / $TotalComputers * 100, 2)
+	Update-Progress $Title $Percent
+
+	#Write-Progress -Activity "Processing $($CurrentComputerCount++) of $($TotalComputers) Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) + "%") -PercentComplete ((($TotalComputers - $CurrentComputerCount) / $TotalComputers) * 100) -ErrorAction SilentlyContinue
 
 	if ($Computer.ProtectedFromAccidentalDeletion -eq $True)
 	{
@@ -1882,9 +1945,6 @@ $FinalReport.Add($(Get-HTMLContentclose))
 $FinalReport.Add($(Get-HTMLTabContentClose))
 $FinalReport.Add($(Get-HTMLClosePage))
 
-$Day = (Get-Date).Day
-$Month = (Get-Date).Month
-$Year = (Get-Date).Year
-$ReportName = ("$Day - $Month - $Year - AD Report")
+$ReportName = ($ReportTitle)
 
 Save-HTMLReport -ReportContent $FinalReport -ShowReport -ReportName $ReportName -ReportPath $ReportSavePath

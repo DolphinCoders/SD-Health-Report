@@ -99,8 +99,9 @@ Function Get-AutomateInstalls {
                 $ComputerRow.LastLogon = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('g') 
 
 				# Write the progress to the screen as it goes through the loop
-                $PercentComplete = [math]::Round($Iteration / $ComputersToCount.Count * 100, 2)
-                Write-Progress -Activity "Checking Computer $Computer" -Status "($PercentComplete% Complete:" -PercentComplete $PercentComplete;
+				$PercentComplete = [math]::Round($Iteration / $ComputersToCount.Count * 100, 2)
+				$Title = "Checking Computer $Computer"
+				Update-Progress($PercentComplete, $Title)
                 
 				# Tests the connection, seeing if the PC is currently online
 				If(Test-Connection -ComputerName $Computer -Count 1 -Quiet)
@@ -304,4 +305,13 @@ Function CheckPathExists($Path, $File) {
 	{
 		Write-Host "$File file path is already present, continuing"
 	}
+}
+
+Function Update-Progress($Percent, $Title) {
+	if ($Percent -eq 100) {
+			Write-Progress -Activity "$Title" -Status "Ready" -Completed
+	} else {
+			Write-Progress -Activity "$Title" -Status "$Percent% Complete:" -PercentComplete $Percent;
+	}
+
 }
