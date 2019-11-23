@@ -114,24 +114,23 @@ Write-Host "__________________________________" -ForegroundColor White
 (Write-Host -NoNewline "Amount of Days for Newly Modified AD Objects Report: " -ForegroundColor Yellow), (Write-Host  $ADModNumber -ForegroundColor White)
 Write-Host "__________________________________" -ForegroundColor White
 
-function LastLogonConvert ($ftDate)
+function Convert-Date ($ftDate)
 {
 	
 	$Date = [DateTime]::FromFileTime($ftDate)
 	
-	if ($Date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $null -eq $date)
+	if ($Date -lt (Get-Date '1/1/1900') -or $Date -eq 0 -or $Null -eq $Date)
 	{
 		
 		"Never"
 	}
-	
 	else
 	{
 		
 		$Date.ToString('yyyy-MM-dd hh:mm:ss tt')
 	}
 	
-} #End function LastLogonConvert
+} #End function Convert-Date
 
 Function Update-Progress($Title, $Percent) {
 	if ($Percent -eq 100) {
@@ -312,7 +311,7 @@ foreach ($ADObj in $ADObjs)
 		
 		'Name'	      = $Name
 		'Object Type' = $ADObj.ObjectClass
-		'When Changed' = $ADObj.WhenChanged
+		'When Changed' = Convert-Date $ADObj.WhenChanged.ToFileTime()
 	}
 	
 	$ADObjectTable.Add($obj)
@@ -397,7 +396,7 @@ foreach ($Newuser in $Newusers)
 		
 		'Name' = $Newuser.Name
 		'Enabled' = $Newuser.Enabled
-		'Creation Date' = $Newuser.WhenCreated
+		'Creation Date' = (Convert-Date $Newuser.WhenCreated.ToFileTime())
 	}
 	
 	$NewCreatedUsersTable.Add($obj)
@@ -506,8 +505,8 @@ foreach ($DefaultComputer in $DefaultComputers)
 		'Name' = $DefaultComputer.Name
 		'Enabled' = $DefaultComputer.Enabled
 		'Operating System' = $DefaultComputer.OperatingSystem
-		'Modified Date' = $DefaultComputer.Modified.ToString("yyyy-MM-dd hh:mm:ss tt")
-		'Password Last Set' = $DefaultComputer.PasswordLastSet
+		'Modified Date' = (Convert-Date $DefaultComputer.Modified.ToFileTime())
+		'Password Last Set' = Convert-Date $DefaultComputer.PasswordLastSet.ToFileTime()
 		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
 	}
 	
@@ -519,13 +518,13 @@ if (($DefaultComputersinDefaultOUTable).Count -eq 0)
 	
 	$Obj = [PSCustomObject]@{
 		
-		Information = 'Information: No computers were found in the Default OU'
+		Information = 'Information: No computers were found in the Default OU (' + $DefaultComputersOU + ')'
 	}
 	$DefaultComputersinDefaultOUTable.Add($obj)
 }
 
 $DefaultUsersOU = (Get-ADDomain).UsersContainer
-$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'LastLogon'; Expression = { LastLogonConvert $_.LastLogon } }, DistinguishedName
+$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'LastLogon'; Expression = { Convert-Date $_.LastLogon } }, DistinguishedName
 
 $TotalDefaultUsers = $DefaultUsers.Count
 $CurrentDefaultUserCount = 0
@@ -545,7 +544,7 @@ foreach ($DefaultUser in $DefaultUsers)
 		'UserPrincipalName' = $DefaultUser.UserPrincipalName
 		'Enabled' = $DefaultUser.Enabled
 		'Protected from Deletion' = $DefaultUser.ProtectedFromAccidentalDeletion
-		'Last Logon' = $DefaultUser.LastLogon
+		'Last Logon' = Convert-Date $DefaultUser.LastLogon
 		'Email Address' = $DefaultUser.EmailAddress
 	}
 	
@@ -556,7 +555,7 @@ if (($DefaultUsersinDefaultOUTable).Count -eq 0)
 	
 	$Obj = [PSCustomObject]@{
 		
-		Information = 'Information: No Users were found in the default OU'
+		Information = 'Information: No Users were found in the default OU (' + $DefaultUsersOU + ')'
 	}
 	$DefaultUsersinDefaultOUTable.Add($obj)
 }
@@ -965,7 +964,7 @@ foreach ($OU in $OUs)
 		
 		'Name' = $OU.Name
 		'Linked GPOs' = $LinkedGPOs
-		'Modified Date' = $OU.WhenChanged
+		'Modified Date' = (Convert-Date $OU.WhenChanged.ToFileTime())
 		'Protected from Deletion' = $OU.ProtectedFromAccidentalDeletion
 	}
 	
@@ -1043,7 +1042,7 @@ $Userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[
 foreach ($User in $AllUsers)
 {
 	
-	$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'LastLogon'; Expression = { LastLogonConvert $_.LastLogon } }, DistinguishedName
+	$AttVar = $User | Select-Object Enabled, PasswordExpired, @{ Name = 'PasswordLastSet'; Expression = { Convert-Date $_.PasswordLastSet.ToFileTime() }}, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, @{ Name = 'AccountExpirationDate'; Expression = { Convert-Date $_.AccountExpirationDate } }, @{ Name = 'LastLogon'; Expression = { Convert-Date $_.LastLogon } }, DistinguishedName
 	$maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge.Days
 	
 	if ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false))
@@ -1320,7 +1319,7 @@ foreach ($GPO in $GPOs)
 		
 		'Name' = $GPO.DisplayName
 		'Status' = $GPO.GpoStatus
-		'Modified Date' = $GPO.ModificationTime
+		'Modified Date' = Convert-Date $GPO.ModificationTime.ToFileTime()
 		'User Version' = $GPO.UserVersion
 		'Computer Version' = $GPO.ComputerVersion
 	}
@@ -1406,9 +1405,9 @@ foreach ($Computer in $Computers)
 		'Name' = $Computer.Name
 		'Enabled' = $Computer.Enabled
 		'Operating System' = $Computer.OperatingSystem
-		'Modified Date' = $Computer.Modified.ToString("yyyy-MM-dd hh:mm:ss tt")
+		'Modified Date' = (Convert-Date $Computer.Modified.ToFileTime())
 		'Last Logon' = [datetime]::FromFileTime((Get-ADComputer -Identity $Computer -Properties * | ForEach-Object { $_.LastLogonTimeStamp } | Out-String)).ToString('yyyy-MM-dd hh:mm:ss tt') 
-		'Password Last Set' = $Computer.PasswordLastSet
+		'Password Last Set' = Convert-Date $Computer.PasswordLastSet.ToFileTime()
 		'Protect from Deletion' = $Computer.ProtectedFromAccidentalDeletion
 		
 	}
@@ -1947,4 +1946,4 @@ $FinalReport.Add($(Get-HTMLClosePage))
 
 $ReportName = ($ReportTitle)
 
-Save-HTMLReport -ReportContent $FinalReport -ShowReport -ReportName $ReportName -ReportPath $ReportSavePath
+Save-HTMLReport -ReportContent $FinalReport -ReportName $ReportName -ReportPath $ReportSavePath
