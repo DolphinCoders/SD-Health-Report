@@ -155,6 +155,39 @@ Function CheckPathExists($Path, $File) {
 	}
 }
 
+Function Invoke-DcDiag {
+    param(
+        [Parameter(Mandatory=$False)]
+        [ValidateScript({
+        $EAP = $ErrorActionPreference
+        $retval = $true
+        $ErrorActionPreference = 'Stop'
+        Try{ ForEach($DCName in $_) { Get-ADDomainController $DCName } } Catch { $retval = $false; Throw "$DCName doesn't exist or other error" } Finally { $ErrorActionPreference = $EAP }    
+        $retval
+        })]
+        [string[]]$DomainControllers = $(Get-ADDomainController -Filter { IsReadOnly -ne $true } | Select-Object -ExpandProperty Name)
+    )
+    Begin {
+#Ref:  http://blogs.microsoft.co.il/scriptfanatic/2012/04/13/custom-objects-default-display-in-powershell-30/
+        [string[]]$DefaultProperties = 'DomainController','Entity','TestName','TestResult'
+        $PSStandardMembers = [System.Management.Automation.PSMemberInfo[]]$(New-Object System.Management.Automation.PSPropertySet DefaultDisplayPropertySet,$DefaultProperties)
+    }
+    Process {
+        $DCDiagResults = Invoke-Command -ScriptBlock { dcdiag /v } -ComputerName $DomainControllers
+        ForEach ($DCDiagResult in $DCDiagResults | Group-Object -Property PSComputerName ) {
+            $DCDiagResult.Group | select-string -pattern '\. (.*) \b(passed|failed)\b test (.*)' | ForEach-Object {
+                [pscustomobject]@{
+                    DomainController = $DCDiagResult.Name
+                    Entity = $_.Matches.Groups[1].Value
+                    TestName = $_.Matches.Groups[3].Value
+                    TestResult = $_.Matches.Groups[2].Value
+                    FullLog = $DCDiagResult.Group -join "`n"
+                } | Add-Member -MemberType MemberSet -Name PSStandardMembers -Value $PSStandardMembers -PassThru  # With PassThru will also return data to pipeline
+            }
+        }
+    }
+}
+
 #Array of default Security Groups
 $DefaultSGs = @(
 	
@@ -231,6 +264,7 @@ $NewCreatedUsersTable = New-Object 'System.Collections.Generic.List[System.Objec
 $GroupProtectionTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $OUProtectionTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DCDiagTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ADObjectTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ProtectedUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
@@ -259,14 +293,16 @@ $AllDCUsers = foreach($DC in $DCs) {
 $AllUsers = $(
 
     #Select unique accountnames; all user data will be in multiples of the number of Domain Controllers you have
-    $Unique = ($AllDCUsers | Select-Object SamAccountName -Unique | Sort-Object SamAccountName).SamAccountName
+	$Unique = ($AllDCUsers | Select-Object SamAccountName -Unique | Sort-Object SamAccountName).SamAccountName
 
     foreach($U in $Unique) {
 
         #Selects most recent LastLogon time User Object from all Domain Controllers AD User Data; LastLogon does NOT replicate across Domain Controllers
-        ($AllDCUsers | Where-Object { $_.SamAccountName -Match $U } | Sort-Object LastLogon -Descending)[0]
-    }
+        ($AllDCUsers | Where-Object { $_.SamAccountName -Match $U } | Sort-Object LastLogon -Descending | Select-Object –First 1)
+	}
+
 )
+
 
 #Retrieve all computers
 $Computers = Get-ADComputer -Filter * -Properties *
@@ -653,7 +689,7 @@ if (($SecurityEventTable).Count -eq 0)
 # 	$DomainTable.Add($obj)
 # }
 
-# Write-Host "Done!" -ForegroundColor White
+Write-Host "Done!" -ForegroundColor White
 
 <###########################
 
@@ -1331,11 +1367,67 @@ if (($GPOTable).Count -eq 0)
 	
 	$Obj = [PSCustomObject]@{
 		
-		Information = 'Information: No Group Policy Obejects were found'
+		Information = 'Information: No Group Policy Objects were found'
 	}
 	$GPOTable.Add($obj)
 }
 Write-Host "Done!" -ForegroundColor White
+
+<###########################
+
+	   AD Health
+
+############################>
+Write-Host "Working on DC Diag Report..." -ForegroundColor Green
+
+$DCDiagTable = New-Object 'System.Collections.Generic.List[System.Object]'
+# $TotalDCs = $DCs.Count
+# $CurrentDCCount = 0
+
+$DCDiag = Invoke-DcDiag
+
+foreach ($Log in $DCDiag)
+{
+	# $Title = "Processing $($CurrentDCCount++) of $($TotalDCs) Total DCs..."
+	# $Percent = [math]::Round($CurrentDCCount / $TotalDCs * 100, 2)
+	# Update-Progress $Title $Percent
+
+	$Obj = [PSCustomObject]@{
+		
+		'DC Name' = $Log.DomainController
+		'Test Name' = $Log.TestName
+		'Test Result' = $Log.TestResult
+		'Entity' = $Log.Entity
+	}
+
+	$DCDiagTable.Add($Obj)
+
+}
+
+$OutputDCDiagPath = $ReportSavePath + '\dcdiag.html'
+$FileLine = @()
+
+Foreach ($Line in $DCDiag.FullLog -Split "`n") {
+	$Obj = New-Object -TypeName PSObject
+	$Value = $Line 
+	Add-Member -InputObject $Obj -Type NoteProperty -Name HealthCheck -Value $Value
+	$FileLine += $Obj
+}
+
+$FileLine | ConvertTo-Html -Property HealthCheck | Out-File $OutputDCDiagPath
+
+
+if (($DCDiagTable).Count -eq 0)
+{
+	
+	$Obj = [PSCustomObject]@{
+		
+		Information = 'Information: No DC Diag information was found'
+	}
+	$DCDiagTable.Add($obj)
+}
+Write-Host "Done!" -ForegroundColor White
+
 <###########################
 
 	   Computers
@@ -1478,7 +1570,7 @@ $ComputersEnabledTable.Add($objULic)
 
 Write-Host "Done!" -ForegroundColor White
 
-$tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers')
+$TabArray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers','AD Health')
 
 Write-Host "Compiling Report..." -ForegroundColor Green
 
@@ -1734,8 +1826,8 @@ $PieObjectGroupProtection.DataDefinition.DataValueColumnName = 'Count'
 #Dashboard Report
 $FinalReport = New-Object 'System.Collections.Generic.List[System.Object]'
 $FinalReport.Add($(Get-HTMLOpenPage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo))
-$FinalReport.Add($(Get-HTMLTabHeader -TabNames $tabarray))
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLTabHeader -TabNames $TabArray))
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Company Information"))
 $FinalReport.Add($(Get-HTMLContentTable $CompanyInfoTable))
 $FinalReport.Add($(Get-HTMLContentClose))
@@ -1806,7 +1898,7 @@ $FinalReport.Add($(Get-HTMLContentClose))
 $FinalReport.Add($(Get-HTMLTabContentClose))
 
 #Groups Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[1] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[1] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Groups Overivew"))
 $FinalReport.Add($(Get-HTMLContentTable $TOPGroupsTable -HideFooter))
 $FinalReport.Add($(Get-HTMLContentClose))
@@ -1844,7 +1936,7 @@ $FinalReport.Add($(Get-HTMLContentClose))
 $FinalReport.Add($(Get-HTMLTabContentClose))
 
 #Organizational Unit Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[2] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[2] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Organizational Units"))
 $FinalReport.Add($(Get-HTMLContentDataTable $OUTable -HideFooter))
 $FinalReport.Add($(Get-HTMLContentClose))
@@ -1860,7 +1952,7 @@ $FinalReport.Add($(Get-HTMLContentclose))
 $FinalReport.Add($(Get-HTMLTabContentClose))
 
 #Users Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Overivew"))
 $FinalReport.Add($(Get-HTMLContentTable $TOPUserTable -HideFooter))
@@ -1911,14 +2003,14 @@ $FinalReport.Add($(Get-HTMLContentClose))
 $FinalReport.Add($(Get-HTMLTabContentClose))
 
 #GPO Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Group Policies"))
 $FinalReport.Add($(Get-HTMLContentDataTable $GPOTable -HideFooter))
 $FinalReport.Add($(Get-HTMLContentClose))
 $FinalReport.Add($(Get-HTMLTabContentClose))
 
 #Computers Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Overivew"))
 $FinalReport.Add($(Get-HTMLContentTable $TOPComputersTable -HideFooter))
@@ -1942,6 +2034,15 @@ $FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSe
 $FinalReport.Add($(Get-HTMLContentclose))
 
 $FinalReport.Add($(Get-HTMLTabContentClose))
+
+#DC Diag Report
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $TabArray[6] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "DC Diag"))
+$FinalReport.Add($(Get-HTMLContentDataTable $DCDiagTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
+
+$FinalReport.Add($(Get-HTMLTabContentClose))
+
 $FinalReport.Add($(Get-HTMLClosePage))
 
 $ReportName = ($ReportTitle)
