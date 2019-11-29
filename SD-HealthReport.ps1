@@ -668,26 +668,27 @@ if (($SecurityEventTable).Count -eq 0)
 }
 
 #Tenant Domain
-#Commented out because it's not in use
-# $Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Object{
+$Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Object{
 	
-# 	$obj = [PSCustomObject]@{
+	$obj = [PSCustomObject]@{
 		
-# 		'UPN Suffixes' = $_
-# 		Valid		   = "True"
-# 	}
+		'UPN Suffixes' = $_
+		Valid		   = "True"
+	}
 	
-# 	$DomainTable.Add($obj)
-# }
-# if (($DomainTable).Count -eq 0)
-# {
+	$DomainTable.Add($obj)
+}
+if (($DomainTable).Count -eq 0)
+{
 	
-# 	$Obj = [PSCustomObject]@{
+	$Obj = [PSCustomObject]@{
 		
-# 		Information = 'Information: No UPN Suffixes were found'
-# 	}
-# 	$DomainTable.Add($obj)
-# }
+		Information = 'Information: No UPN Suffixes were found'
+	}
+	$DomainTable.Add($obj)
+}
+
+($Domains)
 
 Write-Host "Done!" -ForegroundColor White
 
