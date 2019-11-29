@@ -114,6 +114,7 @@ Write-Host "__________________________________" -ForegroundColor White
 (Write-Host -NoNewline "Amount of Days for Newly Modified AD Objects Report: " -ForegroundColor Yellow), (Write-Host  $ADModNumber -ForegroundColor White)
 Write-Host "__________________________________" -ForegroundColor White
 
+
 function Convert-Date ($ftDate)
 {
 	
