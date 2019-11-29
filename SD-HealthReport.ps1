@@ -299,7 +299,7 @@ $AllUsers = $(
     foreach($U in $Unique) {
 
         #Selects most recent LastLogon time User Object from all Domain Controllers AD User Data; LastLogon does NOT replicate across Domain Controllers
-        ($AllDCUsers | Where-Object { $_.SamAccountName -Match $U } | Sort-Object LastLogon -Descending | Select-Object –First 1)
+        ($AllDCUsers | Where-Object { $_.SamAccountName -Match $U } | Sort-Object LastLogon -Descending | Select-Object -First 1)
 	}
 
 )
