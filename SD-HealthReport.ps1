@@ -91,11 +91,11 @@ param (
 	#Default template is orange and named "Sample"
 )
 
-#Enable WinRM
-winrm quickconfig -quiet
+# #Enable WinRM
+# winrm quickconfig -quiet
 
-#Enable PSRemoting
-Enable-PSRemoting -Force
+# #Enable PSRemoting
+# Enable-PSRemoting -Force
 
 #Check for ReportHTML Module
 $Mod = Get-Module -ListAvailable -Name "ReportHTML"
@@ -103,6 +103,17 @@ $Mod = Get-Module -ListAvailable -Name "ReportHTML"
 If ($null -eq $Mod)
 {	
 	Write-Host "ReportHTML Module is not present, attempting to install it"
+	
+	Install-Module -Name ReportHTML -Force
+	Import-Module ReportHTML -ErrorAction SilentlyContinue
+}
+
+#Check for ReportHTML Module
+$Mod = Get-Module -ListAvailable -Name "Invoke-CommandAs"
+
+If ($null -eq $Mod)
+{	
+	Write-Host "Invoke-CommandAs Module is not present, attempting to install it"
 	
 	Install-Module -Name ReportHTML -Force
 	Import-Module ReportHTML -ErrorAction SilentlyContinue
@@ -180,7 +191,7 @@ Function Invoke-DcDiag {
         $PSStandardMembers = [System.Management.Automation.PSMemberInfo[]]$(New-Object System.Management.Automation.PSPropertySet DefaultDisplayPropertySet,$DefaultProperties)
     }
     Process {
-        $DCDiagResults = Invoke-Command -ScriptBlock { dcdiag /v } -ComputerName $DomainControllers
+        $DCDiagResults = Invoke-CommandAs -ScriptBlock { dcdiag /v } -ComputerName $DomainControllers -AsSystem -RunElevated
         ForEach ($DCDiagResult in $DCDiagResults | Group-Object -Property PSComputerName ) {
             $DCDiagResult.Group | select-string -pattern '\. (.*) \b(passed|failed)\b test (.*)' | ForEach-Object {
                 [pscustomobject]@{
