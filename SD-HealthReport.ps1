@@ -91,6 +91,9 @@ param (
 	#Default template is orange and named "Sample"
 )
 
+#Enable PSRemoting
+Enable-PSRemoting -Force
+
 #Check for ReportHTML Module
 $Mod = Get-Module -ListAvailable -Name "ReportHTML"
 
