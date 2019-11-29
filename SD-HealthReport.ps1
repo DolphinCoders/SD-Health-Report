@@ -91,6 +91,9 @@ param (
 	#Default template is orange and named "Sample"
 )
 
+#Enable WinRM
+winrm quickconfig -quiet
+
 #Enable PSRemoting
 Enable-PSRemoting -Force
 
